@@ -27,6 +27,7 @@ from fastmcp_tasks import TasksExtension
 from mcp import types as mcp_types
 from mcp.server.subscriptions import InMemorySubscriptionBus, ListenHandler
 from ads_mcp.audit import AuditMiddleware
+from ads_mcp.guards import WriteAllowlistMiddleware
 from ads_mcp.auth_storage import (
     create_audit_storage,
     create_client_storage,
@@ -69,6 +70,8 @@ mcp.add_middleware(
         server=mcp,
     )
 )
+# Added after AuditMiddleware so refused writes are still audited.
+mcp.add_middleware(WriteAllowlistMiddleware(server=mcp))
 
 
 def ensure_subscriptions_listen(server: FastMCP) -> bool:

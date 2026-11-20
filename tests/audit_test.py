@@ -678,7 +678,11 @@ class AuditClientIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
     @patch.dict(
         os.environ,
-        {"GOOGLE_ADS_LOGIN_CUSTOMER_ID": "888-777-6666"},
+        {
+            "GOOGLE_ADS_LOGIN_CUSTOMER_ID": "888-777-6666",
+            # Fork: mutate calls through the coordinator need an allowlist.
+            "GOOGLE_ADS_MCP_WRITE_ALLOWLIST": "1234567890",
+        },
         clear=False,
     )
     @patch("ads_mcp.utils.get_googleads_client")
