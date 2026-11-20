@@ -1,5 +1,5 @@
 # Tools config for the HBK Cloud Run deployment.
-# Selected with GOOGLE_ADS_MCP_TOOLS_CONFIG=/app/deploy/tools_config.yaml
+# Selected with GOOGLE_ADS_MCP_TOOLS_CONFIG=/app/deploy.tools_config.yaml
 # Upstream asset/label write tools stay off, matching the previous deployment.
 namespaces:
   customers: true
