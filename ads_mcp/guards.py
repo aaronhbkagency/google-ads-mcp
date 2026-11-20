@@ -11,6 +11,9 @@ Environment variables:
         to run (fail closed).
     GOOGLE_ADS_MCP_MAX_BUDGET_INCREASE_PCT: Optional. Largest percentage
         increase allowed on an existing budget in one call (e.g. "50").
+    GOOGLE_ADS_MCP_MAX_CPC: Optional. Highest max CPC bid a tool may set, in the
+        account's currency. If unset, GOOGLE_ADS_MCP_MAX_DAILY_BUDGET is used as
+        the ceiling; with neither set, bid changes are refused.
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ logger = logging.getLogger(__name__)
 ALLOWLIST_ENV = "GOOGLE_ADS_MCP_WRITE_ALLOWLIST"
 MAX_DAILY_BUDGET_ENV = "GOOGLE_ADS_MCP_MAX_DAILY_BUDGET"
 MAX_BUDGET_INCREASE_PCT_ENV = "GOOGLE_ADS_MCP_MAX_BUDGET_INCREASE_PCT"
+MAX_CPC_ENV = "GOOGLE_ADS_MCP_MAX_CPC"
 
 MICROS_PER_UNIT = 1_000_000
 
@@ -115,6 +119,37 @@ def check_daily_budget(amount: float) -> int:
     return to_micros(amount)
 
 
+def check_cpc_bid(amount: float) -> int:
+    """Validates a max CPC bid against GOOGLE_ADS_MCP_MAX_CPC.
+
+    When GOOGLE_ADS_MCP_MAX_CPC is unset, the daily budget cap is the ceiling
+    (a bid above a whole day's budget is never intended). With neither set,
+    bid changes are refused.
+
+    Returns:
+        The bid in micros.
+    """
+    if amount is None or float(amount) <= 0:
+        raise ToolError("Error: A CPC bid must be greater than 0.")
+    cap = _get_float_env(MAX_CPC_ENV)
+    cap_name = MAX_CPC_ENV
+    if cap is None:
+        cap = _get_float_env(MAX_DAILY_BUDGET_ENV)
+        cap_name = MAX_DAILY_BUDGET_ENV
+    if cap is None:
+        raise ToolError(
+            "Error: Bid changes are disabled on this server because neither "
+            f"{MAX_CPC_ENV} nor {MAX_DAILY_BUDGET_ENV} is set. No changes "
+            "were made."
+        )
+    if float(amount) > cap:
+        raise ToolError(
+            f"Error: A CPC bid of {float(amount):.2f} is above this server's "
+            f"cap of {cap:.2f} ({cap_name}). No changes were made."
+        )
+    return to_micros(amount)
+
+
 def check_budget_increase(old_micros: int, new_micros: int) -> None:
     """Refuses an increase larger than GOOGLE_ADS_MCP_MAX_BUDGET_INCREASE_PCT."""
     max_pct = _get_float_env(MAX_BUDGET_INCREASE_PCT_ENV)
@@ -155,14 +190,10 @@ class WriteAllowlistMiddleware(Middleware):
         from ads_mcp.audit import _is_read_only_tool, _resolve_tool
 
         arguments: Mapping[str, Any] = context.message.arguments or {}
-        tool = await _resolve_tool(
-            context, context.message.name, self._fallback_server
-        )
+        tool = await _resolve_tool(context, context.message.name, self._fallback_server)
         read_only = _is_read_only_tool(tool)
         mutating = (
-            read_only is False
-            if tool is not None
-            else _looks_like_mutation(arguments)
+            read_only is False if tool is not None else _looks_like_mutation(arguments)
         )
         if mutating:
             try:

@@ -8,3 +8,5 @@ namespaces:
   labels: false
   assets: false
   campaigns: true
+  keywords: true
+  ads: true

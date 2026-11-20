@@ -10,3 +10,5 @@ namespaces:
   labels: true
   assets: true
   campaigns: true
+  keywords: true
+  ads: true
